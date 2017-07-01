@@ -1,7 +1,15 @@
-#product info
-PRODUCTURL = '*********'
-PRODUCTNAME = '******'
+##product info
+ASIN = 'xxxxxx'
 
-#telegram info
-CHAT_ID = '*******'
-AUTH_TOKEN = '********'
+##telegram info
+CHAT_ID = 'xxxxxx'
+AUTH_TOKEN = 'xxxxxx'
+
+##user agent
+USER_AGENT = 'xxxxxx'
+
+##aws info
+ACCESS_KEY = 'xxxxxx'
+SECRET_KEY = 'xxxxxx'
+ASOC_TAG = 'xxxxxx'
+HOST = 'ecs.amazonaws.de'

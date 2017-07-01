@@ -12,17 +12,11 @@ from random import randint
 
 from telegram.ext import Updater
 
+import aws_api as aws
+
 updater = Updater(token=config.AUTH_TOKEN)
 
 counter = 0
-
-def terminate(signal, frame):
-    print("received SIGINT, exit...")
-    updater.stop()
-    quit()
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, terminate)
 
 telegramBot = telegram.Bot(token=config.AUTH_TOKEN)
 print(telegramBot.getMe())
@@ -36,50 +30,39 @@ def start(bot, update):
 start_handler = CommandHandler('start', start)
 dispatcher.add_handler(start_handler)
 
+def check(bot, update, args):
+    print(args)
+    if (len(args) == 1):
+        info = aws.checkOffers(args[0])
+        bot.send_message(chat_id=update.message.chat_id, text= 'Neu: ' + info['LowestNewPrice'] + ' Gebraucht: ' + info['LowestUsedPrice'] + ' [link](' + info['MoreOffersUrl'] + ')', parse_mode=telegram.ParseMode.MARKDOWN)
+        print(update.message.chat_id)
+    
+check_handler = CommandHandler('check', check, pass_args=True)
+dispatcher.add_handler(check_handler)
+
 updater.start_polling()
 
 prices = []
-headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
 
-def checkIfSelling(url, name):
-    try:
-        productPage = requests.get(url, headers=headers)
-        soup = BeautifulSoup(productPage.content, "html.parser")
-    except:
-        print('')
-        print("Failed to load the page!")
-        print('')
-        return False;
-
-    AMWcount = 0;
-    for seller in soup.find_all('h3', {'class':'a-spacing-none olpSellerName'}): ##find imgs (denotes AMW seller)
-        for img in seller.findAll('img'):
-            if (img.get('alt', '') == 'Warehouse Deals'):
-                 AMWcount += 1
-                 priceDiv = seller.parent.parent.find('div', {'class':'a-column a-span2 olpPriceColumn'})
-                 price = priceDiv.find('span', {'class':'a-size-large a-color-price olpOfferPrice a-text-bold'})
-                 priceStr = price.string.strip()
-                 print(priceStr)
-                 if priceStr in prices:
-                    break
-                 else:
-                    prices.append(priceStr)
-                    telegramBot.send_message(chat_id=config.CHAT_ID, text= name + ' Preis: ' + priceStr + ' [link](' + url + ')', parse_mode=telegram.ParseMode.MARKDOWN)
-    if AMWcount > 0:
-        #telegramBot.send_message(chat_id=config.CHAT_ID, text= 'Aktive Warehouse Dealz: ' + AMWcount)
-        return True;
+def checkProduct(itemId):
+    info = aws.checkOffers(itemId)
+    if info['LowestUsedPrice'] in prices:
+        return True
+    else:
+        prices.append(info['LowestUsedPrice'])
+        telegramBot.send_message(chat_id=config.CHAT_ID, text= 'ASIN: ' + info['itemId'] + ' Neu: ' + info['LowestNewPrice'] + ' Gebraucht: ' + info['LowestUsedPrice'] + ' [link](' + info['MoreOffersUrl'] + ')', parse_mode=telegram.ParseMode.MARKDOWN)
+        print(info['LowestUsedPrice'])
+    return True
 
 if __name__ == "__main__":
     while True:
-        print('Scanning for product name: ' + config.PRODUCTNAME)
         if counter > 60:
             del prices[:]
             telegramBot.send_message(chat_id=config.CHAT_ID, text= 'deleted cache')
-        if checkIfSelling(config.PRODUCTURL, config.PRODUCTNAME) == True:
-            rand = randint(30,120)
-            print('Being sold - sleeping for ' + str(rand) + ' seconds.')
+        if checkProduct(config.ASIN) == True:
+            print('sleeping for 60 seconds.')
             print(str(datetime.now()))
-            time.sleep(rand)
+            time.sleep(60)
             print()
             counter = counter + 1
         
