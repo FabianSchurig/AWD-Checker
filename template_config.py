@@ -13,3 +13,6 @@ ACCESS_KEY = 'xxxxxx'
 SECRET_KEY = 'xxxxxx'
 ASOC_TAG = 'xxxxxx'
 HOST = 'ecs.amazonaws.de'
+
+##database
+DB_NAME = 'xxxxx.db'

@@ -16,7 +16,7 @@ import aws_api
 
 import sqlite3
 
-conn = sqlite3.connect('awd.db', check_same_thread=False)
+conn = sqlite3.connect(config.DB_NAME, check_same_thread=False)
 c = conn.cursor()
 
 updater = Updater(token=config.AUTH_TOKEN)
