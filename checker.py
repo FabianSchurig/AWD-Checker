@@ -165,9 +165,11 @@ if __name__ == "__main__":
             asins.append(row[0])
             if counter > 8 or length == 0:
                 counter = 0
+                print('update prices with following asins '+','.join(asins))
                 status = updatePrices(','.join(asins))
                 print('updating following products: '+','.join(asins))
                 print('update '+str(status))
+                asins = []
         ts = time.time()
         timestamp = (datetime.fromtimestamp(ts) - timedelta(seconds=61)).strftime('%Y-%m-%d %H:%M:%S')
         print('Timestamp: '+timestamp)
