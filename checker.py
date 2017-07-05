@@ -1,20 +1,14 @@
-from bs4 import BeautifulSoup
-import requests
-import time
-from datetime import datetime,timedelta
-import config
-import telegram
-import logging
-from telegram.ext import CommandHandler
-import sys
-import signal
-from random import randint
-
-from telegram.ext import Updater
-
 import aws_api
-
+import config
+from datetime import datetime, timedelta
+import logging
+import signal
 import sqlite3
+import sys
+import time
+import telegram
+from telegram.ext import CommandHandler, Updater
+
 
 conn = sqlite3.connect(config.DB_NAME, check_same_thread=False)
 c = conn.cursor()
@@ -57,7 +51,7 @@ def addItem(bot, update, args):
         t = (str(update.message.chat_id),)
         c.execute('SELECT id FROM Users WHERE chatID=?', t)
         userId = c.fetchone()
-        
+
         asinStr = aws_api.validateItemIds(args[0])
         asins = asinStr.split(',')
         noInfo = []
@@ -78,7 +72,7 @@ def addItem(bot, update, args):
         for row in rows:
             alreadyTracked.append(row[0])
             print(row[0])
-        if len(noInfo) > 0 and len(noInfo) <= 10:    
+        if len(noInfo) > 0 and len(noInfo) <= 10:
             items = aws_api.checkOffers(','.join(noInfo),'Offers')
             for item in items['items']:
                 if 'ASIN' in item and 'MoreOffersUrl' in item:
@@ -97,7 +91,7 @@ def addItem(bot, update, args):
                     print('Fail')
             bot.send_message(chat_id=update.message.chat_id, text= 'successfully added '+str(len(noInfo))+' items', parse_mode=telegram.ParseMode.MARKDOWN)
         print(update.message.chat_id)
-    
+
 addItem_handler = CommandHandler('add', addItem, pass_args=True)
 dispatcher.add_handler(addItem_handler)
 
@@ -109,9 +103,9 @@ def check(bot, update, args):
         for asin in asins:
             c.execute('SELECT * FROM Items WHERE asin=?', (str(asin),))
             row = c.fetchone()
-            bot.send_message(chat_id=update.message.chat_id, text= row, parse_mode=telegram.ParseMode.MARKDOWN)        
+            bot.send_message(chat_id=update.message.chat_id, text= row, parse_mode=telegram.ParseMode.MARKDOWN)
         print(update.message.chat_id)
-    
+
 check_handler = CommandHandler('check', check, pass_args=True)
 dispatcher.add_handler(check_handler)
 
@@ -125,9 +119,9 @@ def info(bot, update):
     rows = c.fetchall()
     print(rows)
     for row in rows:
-        bot.send_message(chat_id=update.message.chat_id, text= 'Item '+'ASIN: '+row[2]+' Preis: '+str(row[3]/100)+' '+row[5]+' Zustand: '+('Gebraucht' if row[4] == 1 else 'Neu')+' [link]('+row[1]+')', parse_mode=telegram.ParseMode.MARKDOWN)      
+        bot.send_message(chat_id=update.message.chat_id, text= 'Item '+'ASIN: '+row[2]+' Preis: '+str(row[3]/100)+' '+row[5]+' Zustand: '+('Gebraucht' if row[4] == 1 else 'Neu')+' [link]('+row[1]+')', parse_mode=telegram.ParseMode.MARKDOWN)
     print(update.message.chat_id)
-    
+
 info_handler = CommandHandler('info', info)
 dispatcher.add_handler(info_handler)
 
@@ -189,8 +183,3 @@ if __name__ == "__main__":
         print(str(datetime.now()))
         time.sleep(30)
         print()
-
-
-
-
-
