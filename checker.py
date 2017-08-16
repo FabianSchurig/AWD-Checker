@@ -34,11 +34,11 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 def start(bot, update):
     bot.send_message(chat_id=update.message.chat_id, text="I'm a bot, please talk to me!")
     t = (str(update.message.chat_id),)
-    c.execute('SELECT * FROM Users WHERE chatID=?', t)
+    c.execute('SELECT * FROM Users WHERE chat_id=?', t)
     row = c.fetchone()
     print(row)
     if row is None:
-        c.execute('INSERT INTO Users (chatID, isAdmin) VALUES (?,?)',(str(update.message.chat_id),0,))
+        c.execute('INSERT INTO Users (chat_id, is_admin) VALUES (?,?)',(str(update.message.chat_id),0,))
         conn.commit()
         print('Inserted new user with chat id '+str(t))
 
@@ -49,7 +49,7 @@ def addItem(bot, update, args):
     print(args)
     if (len(args) == 1):
         t = (str(update.message.chat_id),)
-        c.execute('SELECT id FROM Users WHERE chatID=?', t)
+        c.execute('SELECT id FROM Users WHERE chat_id = ?', t)
         userId = c.fetchone()
 
         asinStr = aws_api.validateItemIds(args[0])
@@ -61,12 +61,12 @@ def addItem(bot, update, args):
             if row is None:
                 noInfo.append(asin)
             else:
-                c.execute('SELECT * FROM Track WHERE UserID=? and ItemID=?', (userId[0],row[0],))
+                c.execute('SELECT * FROM Track WHERE user_id=? and item_id=?', (userId[0],row[0],))
                 if c.fetchone() is None:
-                    c.execute('INSERT INTO Track (ItemID, UserID, TargetAmount) VALUES (?,?,?)',(row[0],userId[0],0,))
+                    c.execute('INSERT INTO Track (item_id, user_id, target_amount) VALUES (?,?,?)',(row[0],userId[0],0,))
                     conn.commit()
         alreadyTracked = []
-        c.execute('SELECT ItemID FROM Track WHERE UserID=?', userId)
+        c.execute('SELECT item_id FROM Track WHERE user_id=?', userId)
         rows = c.fetchall()
         print(rows)
         for row in rows:
@@ -82,10 +82,11 @@ def addItem(bot, update, args):
                     row = c.fetchone()
                     print(row)
                     for price in item['prices']:
-                        c.execute('INSERT INTO Prices (ItemID, Condition, Amount, CreatedAt, CurrencyCode) VALUES (?,?,?,?,?)',(row[0],price['Condition'],price['Amount'],price['CreatedAt'],price['CurrencyCode'],))
+                        c.execute('INSERT INTO Prices (item_id, condition, amount, created_at, currency_code) VALUES (?,?,?,?,?)',
+                            (row[0],price['Condition'],price['Amount'],price['CreatedAt'],price['CurrencyCode'],))
                         conn.commit()
                     if row[0] not in alreadyTracked:
-                        c.execute('INSERT INTO Track (ItemID, UserID, TargetAmount) VALUES (?,?,?)',(row[0],userId[0],0,))
+                        c.execute('INSERT INTO Track (item_id, user_id, target_amount) VALUES (?,?,?)',(row[0],userId[0],0,))
                         conn.commit()
                 else:
                     print('Fail')
@@ -110,16 +111,24 @@ check_handler = CommandHandler('check', check, pass_args=True)
 dispatcher.add_handler(check_handler)
 
 def info(bot, update):
-    c.execute('SELECT Max(Prices.CreatedAt) FROM Prices')
+    c.execute('SELECT Max(created_at) FROM Prices')
     maxTime = c.fetchone()
     queryTime = (datetime.strptime(maxTime[0], '%Y-%m-%d %H:%M:%S') - timedelta(seconds=120)).strftime('%Y-%m-%d %H:%M:%S')
     print(maxTime)
     print(queryTime)
-    c.execute('SELECT Distinct chatID,url,asin,Amount,Condition,CurrencyCode FROM Prices INNER JOIN Items ON Prices.ItemID=Items.id INNER JOIN Track ON Items.id=Track.ItemID INNER JOIN Users On Users.id=Track.UserID Where Prices.CreatedAt>? and Users.chatID=?',(queryTime,update.message.chat_id,))
+    c.execute("""SELECT Distinct chat_id,url,asin,amount,condition,currency_code
+        FROM Prices INNER JOIN Items ON Prices.item_id=Items.id
+        INNER JOIN Track ON Items.id=Track.item_id
+        INNER JOIN Users On Users.id=Track.user_id
+        Where Prices.created_at>? and Users.chat_id=?""",
+        (queryTime,update.message.chat_id,))
     rows = c.fetchall()
     print(rows)
     for row in rows:
-        bot.send_message(chat_id=update.message.chat_id, text= 'Item '+'ASIN: '+row[2]+' Preis: '+str(row[3]/100)+' '+row[5]+' Zustand: '+('Gebraucht' if row[4] == 1 else 'Neu')+' [link]('+row[1]+')', parse_mode=telegram.ParseMode.MARKDOWN)
+        bot.send_message(
+            chat_id=update.message.chat_id,
+            text='Item ASIN: '+row[2]+' Preis: '+str(row[3]/100)+' '+row[5]+' Zustand: '+('Gebraucht' if row[4] == 1 else 'Neu')+' [link]('+row[1]+')',
+            parse_mode=telegram.ParseMode.MARKDOWN)
     print(update.message.chat_id)
 
 info_handler = CommandHandler('info', info)
@@ -135,7 +144,8 @@ def updatePrices(itemId):
             for price in item['prices']:
                 c.execute('SELECT id FROM Items WHERE asin=?', (str(item['ASIN']),))
                 row = c.fetchone()
-                c.execute('INSERT INTO Prices (ItemID, Condition, Amount, CreatedAt, CurrencyCode) VALUES (?,?,?,?,?)',(row[0],price['Condition'],price['Amount'],price['CreatedAt'],price['CurrencyCode'],))
+                c.execute('INSERT INTO Prices (item_id, condition, amount, created_at, currency_code) VALUES (?,?,?,?,?)',
+                    (row[0],price['Condition'],price['Amount'],price['CreatedAt'],price['CurrencyCode'],))
                 conn.commit()
                 updated = True
     return updated
@@ -143,11 +153,11 @@ def updatePrices(itemId):
 
 if __name__ == "__main__":
     while True:
-        c.execute('SELECT Max(Prices.CreatedAt) FROM Prices')
+        c.execute('SELECT Max(created_at) FROM Prices')
         maxTime = c.fetchone()
         if maxTime[0] < (datetime.fromtimestamp(time.time()) - timedelta(seconds=61)).strftime('%Y-%m-%d %H:%M:%S'):
             print('old data')
-        c.execute('SELECT Distinct asin FROM Items INNER JOIN Track ON Items.id=Track.ItemID')
+        c.execute('SELECT Distinct asin FROM Items INNER JOIN Track ON Items.id=Track.item_id')
         rows = c.fetchall()
         print(rows)
         counter = 0
@@ -167,17 +177,28 @@ if __name__ == "__main__":
         ts = time.time()
         timestamp = (datetime.fromtimestamp(ts) - timedelta(seconds=61)).strftime('%Y-%m-%d %H:%M:%S')
         print('Timestamp: '+timestamp)
-        c.execute('SELECT * FROM Prices Where Prices.CreatedAt>? and Prices.Condition=1 group by Prices.ItemID,Prices.Amount order by Prices.CreatedAt ASC',(timestamp,))
+        c.execute('SELECT * FROM Prices Where created_at>? and condition=1 group by item_id,amount order by created_at ASC',(timestamp,))
         rows = c.fetchall()
         itemIds = []
         for row in rows:
             if row[1] in itemIds:
                 print(row)
-                c.execute('SELECT Distinct chatID,url,asin,Amount,Condition,CurrencyCode FROM Prices INNER JOIN Items ON Prices.ItemID=Items.id INNER JOIN Track ON Items.id=Track.ItemID INNER JOIN Users On Users.id=Track.UserID Where Prices.ItemID=? and Prices.Condition=1 and Prices.CreatedAt= (SELECT Max(Prices.CreatedAt) FROM Prices)',(row[1],))
+                c.execute("""SELECT Distinct chat_id,url,asin,amount,condition,currency_code
+                    FROM Prices
+                    INNER JOIN Items ON Prices.item_id=Items.id
+                    INNER JOIN Track ON Items.id=Track.item_id
+                    INNER JOIN Users ON Users.id=Track.user_id
+                    WHERE Prices.item_id=?
+                        and Prices.condition=1
+                        and Prices.created_at= (SELECT Max(Prices.created_at) FROM Prices)""",
+                    (row[1],))
                 rowsN = c.fetchall()
                 print(rowsN)
                 for rowN in rowsN:
-                    telegramBot.send_message(chat_id=rowN[0], text= 'Preisänderung '+'ASIN: '+rowN[2]+' Preis: '+str(rowN[3]/100)+' '+rowN[5]+' Zustand: '+('Gebraucht' if rowN[4] == 1 else 'Neu')+' [link]('+rowN[1]+')', parse_mode=telegram.ParseMode.MARKDOWN)
+                    telegramBot.send_message(
+                        chat_id=rowN[0],
+                        text='Preisänderung '+'ASIN: '+rowN[2]+' Preis: '+str(rowN[3]/100)+' '+rowN[5]+' Zustand: '+('Gebraucht' if rowN[4] == 1 else 'Neu')+' [link]('+rowN[1]+')',
+                        parse_mode=telegram.ParseMode.MARKDOWN)
             else:
                 itemIds.append(row[1])
         print(str(datetime.now()))
